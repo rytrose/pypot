@@ -32,6 +32,13 @@ class _DxlAccess(object):
     readonly, writeonly, readwrite = range(3)
 
 
+# TODO: Instead of a general lock we should
+# provide some mechanisms to define if you want
+# to DxlIO to share the same lock
+
+general_lock = threading.Lock()
+
+
 class AbstractDxlIO(object):
     """ Low-level class to handle the serial communication with the robotis motors. """
 
@@ -70,7 +77,7 @@ class AbstractDxlIO(object):
         self._error_handler = error_handler_cls() if error_handler_cls else None
         self._convert = convert
 
-        self._serial_lock = threading.Lock()
+        self._serial_lock = general_lock
 
         self.open(port, baudrate, timeout)
 
@@ -489,6 +496,11 @@ class AbstractDxlIO(object):
                                             instruction_packet)
 
             if not wait_for_status_packet:
+                # TODO: for the hipi we need to force a sleep to make sure
+                # we don't send another packet before this one has actually been sent
+                # I don't really know how we could improve this
+                import time
+                time.sleep(0.001)
                 return
 
             status_packet = self.__real_read(instruction_packet, _force_lock=True)
