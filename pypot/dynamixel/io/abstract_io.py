@@ -380,7 +380,7 @@ class AbstractDxlIO(object):
         convert = kwargs['convert'] if ('convert' in kwargs) else self._convert
 
         if self._sync_read and len(ids) > 1:
-            rp = self._protocol.DxlSyncReadPacket(ids, control.address,
+            rp = self._protocol.DxlSyncReadPacket(tuple(ids), control.address,
                                                   control.length * control.nb_elem)
 
             with self._serial_lock:
@@ -465,7 +465,7 @@ class AbstractDxlIO(object):
             data.extend(itertools.chain((motor_id, ),
                                         dxl_code_all(value, control.length, control.nb_elem)))
 
-        wp = self._protocol.DxlSyncWritePacket(control.address, control.length * control.nb_elem, data)
+        wp = self._protocol.DxlSyncWritePacket(control.address, control.length * control.nb_elem, tuple(data))
         self._send_packet(wp, wait_for_status_packet=False)
 
     # MARK: - Send/Receive packet

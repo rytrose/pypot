@@ -4,6 +4,10 @@ import numpy
 import itertools
 
 from collections import namedtuple
+try:
+    from functools import lru_cache
+except ImportError:
+    from functools32 import lru_cache
 
 name = 'v1'
 
@@ -33,6 +37,7 @@ class DxlPacketHeader(namedtuple('DxlPacketHeader', ('id', 'packet_length'))):
     marker = bytearray((0xFF, 0xFF))
 
     @classmethod
+    @lru_cache(maxsize=None)
     def from_string(cls, data):
         header = bytearray(data)
 
@@ -54,6 +59,10 @@ class DxlInstructionPacket(namedtuple('DxlInstructionPacket',
         (for more details see http://support.robotis.com/en/product/dxl_main.htm)
 
         """
+    def __hash__(self):
+        return hash((self.id, self.instruction, tuple(self.parameters)))
+
+    @lru_cache(maxsize=None)
     def to_array(self):
         return bytearray(itertools.chain(DxlPacketHeader.marker,
                                          (self.id, self.length, self.instruction),
@@ -91,6 +100,7 @@ class DxlResetPacket(DxlInstructionPacket):
 
 class DxlReadDataPacket(DxlInstructionPacket):
     """ This class is used to represent read data packet (to read value). """
+    @lru_cache(maxsize=None)
     def __new__(cls, id, address, length):
         return DxlInstructionPacket.__new__(cls, id,
                                             DxlInstruction.READ_DATA,
@@ -105,6 +115,7 @@ class DxlReadDataPacket(DxlInstructionPacket):
 
 class DxlSyncReadPacket(DxlInstructionPacket):
     """ This class is used to represent sync read packet (to synchronously read values). """
+    @lru_cache(maxsize=None)
     def __new__(cls, ids, address, length):
         return DxlInstructionPacket.__new__(cls, DxlBroadcast,
                                             DxlInstruction.SYNC_READ,
@@ -120,6 +131,7 @@ class DxlSyncReadPacket(DxlInstructionPacket):
 
 class DxlWriteDataPacket(DxlInstructionPacket):
     """ This class is used to reprensent write data packet (to write value). """
+    @lru_cache(maxsize=None)
     def __new__(cls, id, address, coded_value):
         return DxlInstructionPacket.__new__(cls, id,
                                             DxlInstruction.WRITE_DATA,
@@ -135,6 +147,7 @@ class DxlWriteDataPacket(DxlInstructionPacket):
 
 class DxlSyncWritePacket(DxlInstructionPacket):
     """ This class is used to represent sync write packet (to synchronously write values). """
+    @lru_cache(maxsize=None)
     def __new__(cls, address, length, id_value_couples):
         return DxlInstructionPacket.__new__(cls, DxlBroadcast,
                                             DxlInstruction.SYNC_WRITE,
@@ -167,10 +180,11 @@ class DxlStatusPacket(namedtuple('DxlStatusPacket', ('id', 'error', 'parameters'
 
         """
     @classmethod
+    @lru_cache(maxsize=None)
     def from_string(cls, data):
         packet = bytearray(data)
 
-        header = DxlPacketHeader.from_string(packet[:4])
+        header = DxlPacketHeader.from_string(data[:4])
 
         if len(packet) != DxlPacketHeader.length + header.packet_length \
                 or cls._checksum(packet) != packet[-1]:

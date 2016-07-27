@@ -15,6 +15,7 @@ extra = {}
 if sys.version_info >= (3,):
     extra['use_2to3'] = True
 
+
 install_requires = ['numpy',
                     'pyserial>2.6',
                     'scipy',
@@ -24,6 +25,9 @@ install_requires = ['numpy',
 if sys.version_info < (2, 7):
     print("python version < 2.7 is not supported")
     sys.exit(1)
+
+if sys.version_info < (3, 2):
+    install_requires.append('functools32')
 
 if sys.version_info < (3, 4):
     install_requires.append('enum34')
