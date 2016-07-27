@@ -431,6 +431,8 @@ class AbstractDxlIO(object):
                 for i, v in enumerate(itertools.chain(*values) if control.nb_elem > 1 else values):
                     if v == max_val:
                         lost_ids.append(ids[i // control.nb_elem])
+
+                self.flush(_force_lock=False)
                 e = DxlTimeoutError(self, rp, list(set(lost_ids)))
                 if self._error_handler:
                     self._error_handler.handle_timeout(e)
@@ -479,11 +481,10 @@ class AbstractDxlIO(object):
                             'timeout': self.timeout})
 
         with self.__force_lock(_force_lock) or self._serial_lock:
-            self.flush(_force_lock=True)
-
             data = instruction_packet.to_string()
             nbytes = self._serial.write(data)
             if len(data) != nbytes:
+                self.flush(_force_lock=True)
                 raise DxlCommunicationError(self,
                                             'instruction packet not entirely sent',
                                             instruction_packet)
@@ -504,6 +505,7 @@ class AbstractDxlIO(object):
         with self.__force_lock(_force_lock) or self._serial_lock:
             data = self._serial.read(self._protocol.DxlPacketHeader.length)
             if not data:
+                self.flush(_force_lock=True)
                 raise DxlTimeoutError(self, instruction_packet, instruction_packet.id)
 
             try:
@@ -512,6 +514,7 @@ class AbstractDxlIO(object):
                 status_packet = self._protocol.DxlStatusPacket.from_string(data)
 
             except ValueError:
+                self.flush(_force_lock=True)
                 msg = 'could not parse received data {}'.format(bytearray(data))
                 raise DxlCommunicationError(self, msg, instruction_packet)
 
@@ -538,9 +541,11 @@ class AbstractDxlIO(object):
             return sp
 
         except DxlTimeoutError as e:
+            self.flush(_force_lock=False)
             error_handler.handle_timeout(e)
 
         except DxlCommunicationError as e:
+            self.flush(_force_lock=False)
             error_handler.handle_communication_error(e)
 
 
