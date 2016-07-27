@@ -475,11 +475,6 @@ class AbstractDxlIO(object):
         if self.closed:
             raise DxlError('try to send a packet on a closed serial communication')
 
-        logger.debug('Sending %s', instruction_packet,
-                     extra={'port': self.port,
-                            'baudrate': self.baudrate,
-                            'timeout': self.timeout})
-
         with self.__force_lock(_force_lock) or self._serial_lock:
             data = instruction_packet.to_string()
             nbytes = self._serial.write(data)
@@ -493,11 +488,6 @@ class AbstractDxlIO(object):
                 return
 
             status_packet = self.__real_read(instruction_packet, _force_lock=True)
-
-            logger.debug('Receiving %s', status_packet,
-                         extra={'port': self.port,
-                                'baudrate': self.baudrate,
-                                'timeout': self.timeout})
 
             return status_packet
 
