@@ -8,12 +8,15 @@ Configuration are written as Python dictionary so you can define/modify them pro
 * motorgroups: It allows to define alias of group of motors. They can be nested.
 
 """
+import tempfile
 import logging
 import numpy
 import time
 import json
+import os
 
 from collections import OrderedDict
+from subprocess import Popen
 
 import pypot.sensor
 import pypot.dynamixel
@@ -24,7 +27,7 @@ import pypot.dynamixel.syncloop
 
 from .robot import Robot
 from .controller import DummyController
-
+from .controller_client import DetachedControllerClient
 
 # This logger should always provides the config as extra
 logger = logging.getLogger(__name__)
@@ -58,7 +61,12 @@ def from_config(config, strict=True, sync=True, use_dummy_io=False, **extra):
             strict = False
 
         attached_ids = [m.id for m in attached_motors]
-        if not use_dummy_io:
+
+        if 'use_separate_process' in c_params and c_params['use_separate_process']:
+            launch_controller_server(c_params, config)
+            controllers.append(DetachedControllerClient(attached_motors))
+
+        elif not use_dummy_io:
             dxl_io = dxl_io_from_confignode(config, c_params, attached_ids, strict)
 
             check_motor_eprom_configuration(config, dxl_io, motor_names)
@@ -258,6 +266,48 @@ def make_alias(config, robot):
         logger.info("Creating alias '%s' for motors %s",
                     alias_name, [motor.name for motor in motors],
                     extra={'config': config})
+
+
+def launch_controller_server(c_params, config):
+    controller = dict(c_params)
+    controller['use_separate_process'] = False
+
+    motorgroups = {
+        group: config['motorgroups'][group]
+        for group in controller['attached_motors']
+    }
+
+    motors = {
+        motor: config['motors'][motor]
+        for motor in sum(motorgroups.values(), [])
+    }
+    for val in motors.values():
+        val['offset'] = 0
+        val['orientation'] = 'direct'
+
+    tmp_config = {
+        "controllers": {
+            'my_remote_controller': controller
+        },
+        'motorgroups': motorgroups,
+        'motors': motors,
+        'sensors': {
+        }
+    }
+
+    filename = os.path.join(tempfile.mkdtemp(), 'pypotzmq')
+    with open(filename, 'w') as fp:
+        json.dump(tmp_config, fp)
+        fp.flush()
+
+    args = []
+    if 'req_port' in c_params:
+        args += ['--req-port', str(c_params['req_port'])]
+    if 'pub_port' in c_params:
+        args += ['--pub-port', str(c_params['pub_port'])]
+
+    cmd = ['python', '-m', 'pypot.robot.detached_controller', filename] + args
+    Popen(cmd)
 
 
 def from_json(json_file, sync=True, strict=True, use_dummy_io=False, **extra):
