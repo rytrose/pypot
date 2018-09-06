@@ -72,3 +72,10 @@ class BaseErrorHandler(DxlErrorHandler):
 
     def handle_none_error(self, instruction_packet):
         logger.info('None Error!')
+
+    def handle_input_voltage_error(self, instruction_packet):
+        logger.error("Too much voltage through the motors!!!!")
+        raise OSError
+
+    def handle_checksum_error(self, instruction_packet):
+        logger.warning("Checksum error.")
